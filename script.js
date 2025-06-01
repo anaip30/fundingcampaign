@@ -1,9 +1,10 @@
-import { ethers } from "https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.min.js";
+import { ethers } from "https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.5/ethers.min.js";
 
-// TODO: Unesite adresu deploy-anog ugovora ispod
-const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; 
+// 1) Zamijeni sljedeću adresu s adresom svoga deploy-anog Crowdfunding ugovora:
+const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
-// ABI pametnog ugovora (kopirajte iz artifacts/contracts/Crowdfunding.sol/Crowdfunding.json)
+// 2) U polje `abi` zalijepi ABI iz `artifacts/contracts/Crowdfunding.sol/Crowdfunding.json`
+//   Primjer: kopiraj sve od [ do ] u JSON-u pod ključem "abi"
 const abi = [
   {
     "inputs": [
@@ -61,109 +62,125 @@ const abi = [
 
 let provider, signer, contract;
 
-// Inicijalizacija prilikom učitavanja stranice
-window.addEventListener('load', async () => {
-  if (window.ethereum) {
-    provider = new ethers.BrowserProvider(window.ethereum);
-    await window.ethereum.request({ method: 'eth_requestAccounts' });
-    signer = await provider.getSigner();
-    contract = new ethers.Contract(contractAddress, abi, signer);
-    await displayCampaigns();
-  } else {
-    alert('Molimo instalirajte MetaMask!');
+// Kad se stranica učita, pokušati se automatski spojiti na MetaMask i inicijalizirati ugovor
+window.addEventListener("load", async () => {
+  if (!window.ethereum) {
+    alert("MetaMask nije pronađen. Instaliraj MetaMask i ponovno učitaj stranicu.");
+    return;
   }
+  // 1) Kreiraj provider (povezivanje s Ethereum mrežom preko MetaMaska)
+  provider = new ethers.BrowserProvider(window.ethereum);
+  // 2) Zatraži odobrenje korisnika za pristup računima
+  await provider.send("eth_requestAccounts", []);
+  // 3) Dohvati signer (trenutni račun)
+  signer = await provider.getSigner();
+  // 4) Kreiraj instancu ugovora
+  contract = new ethers.Contract(contractAddress, abi, signer);
+  // 5) Prikaži trenutno aktivne kampanje
+  await displayCampaigns();
 });
 
 // Funkcija za prikaz aktivnih kampanja
 async function displayCampaigns() {
   const campaigns = await contract.getCampaigns();
+  // Dohvati trenutačno vrijeme u sekundi na blockchainu
   const block = await provider.getBlock("latest");
   const now = block.timestamp;
 
-  const campaignList = document.getElementById('campaignList');
-  campaignList.innerHTML = '';
+  const listDiv = document.getElementById("campaignList");
+  listDiv.innerHTML = ""; // očisti prethodni sadržaj
 
-  campaigns.forEach((c, id) => {
-    // Prikaži samo kampanje koje još traju (aktivne)
-    if (c.endAt > now) {
-      const div = document.createElement('div');
-      div.innerHTML = `<strong>ID:</strong> ${id} | <strong>Owner:</strong> ${c.owner} |
-        <strong>Goal:</strong> ${c.goal} wei | <strong>Pledged:</strong> ${c.pledged} wei |
-        <strong>Ends:</strong> ${new Date(c.endAt * 1000).toLocaleString()}<br>`;
+  // Ako nema kampanja, prikaži poruku
+  if (campaigns.length === 0) {
+    listDiv.innerHTML = "<p>Još nema aktivnih kampanja.</p>";
+    return;
+  }
 
-      // Unos za iznos za pledge
-      const pledgeInput = document.createElement('input');
-      pledgeInput.type = 'number';
-      pledgeInput.id = `pledgeAmount${id}`;
-      pledgeInput.placeholder = 'Amount (wei)';
-      div.appendChild(pledgeInput);
+  // Iteriraj kroz sve vraćene kampanje
+  campaigns.forEach((c, idx) => {
+    // c = objekt s poljima: owner, goal, pledged, startAt, endAt, claimed
+    const { owner, goal, pledged, startAt, endAt, claimed } = c;
+    // Prikaži samo kampanje koje još nisu istekle
+    if (now <= Number(endAt.toString())) {
+      // Stvori novi div za kampanju
+      const div = document.createElement("div");
+      div.className = "campaign";
 
-      // Gumb za pledgati
-      const pledgeBtn = document.createElement('button');
-      pledgeBtn.innerText = 'Pledge';
-      pledgeBtn.onclick = async () => {
-        const amount = pledgeInput.value;
-        if (!amount) return;
-        try {
-          await contract.pledge(id, { value: BigInt(amount) });
-          alert('Pledged successfully!');
-          await displayCampaigns();
-        } catch (err) {
-          alert('Error: ' + err.message);
-        }
-      };
-      div.appendChild(pledgeBtn);
+      // Konverzija vrijednosti iz Wei-a u ljudski čitljiv format (ETH) – opcionalno
+      const goalEth = ethers.formatEther(goal.toString());
+      const pledgedEth = ethers.formatEther(pledged.toString());
+      const endDate = new Date(Number(endAt.toString()) * 1000).toLocaleString();
 
-      // Ako je kampanja završila i postigla cilj, omogući withdraw vlasniku
-      if (now > c.endAt && c.pledged >= c.goal && !c.claimed) {
-        const withdrawBtn = document.createElement('button');
-        withdrawBtn.innerText = 'Withdraw';
-        withdrawBtn.onclick = async () => {
+      div.innerHTML = `
+        <p><strong>ID:</strong> ${idx} </p>
+        <p><strong>Vlasnik:</strong> ${owner}</p>
+        <p><strong>Cilj:</strong> ${goalEth} ETH</p>
+        <p><strong>Prikupljeno:</strong> ${pledgedEth} ETH</p>
+        <p><strong>Rok:</strong> ${endDate}</p>
+      `;
+
+      // Ako kampanja još traje, omogući pledganje
+      if (!claimed && now <= Number(endAt.toString())) {
+        const pledgeInput = document.createElement("input");
+        pledgeInput.type = "number";
+        pledgeInput.id = `pledgeAmt_${idx}`;
+        pledgeInput.placeholder = "Iznos (ETH)";
+        div.appendChild(pledgeInput);
+
+        const pledgeBtn = document.createElement("button");
+        pledgeBtn.innerText = "Pledge";
+        pledgeBtn.onclick = async () => {
+          const amountEth = pledgeInput.value;
+          if (!amountEth || Number(amountEth) <= 0) {
+            alert("Unesi ispravan iznos za uplatu.");
+            return;
+          }
           try {
-            await contract.withdraw(id);
-            alert('Withdraw successful!');
+            const amountWei = ethers.parseEther(amountEth.toString());
+            const tx = await contract.pledge(idx, { value: amountWei });
+            await tx.wait();
+            alert("Uspješno uplatio/la " + amountEth + " ETH u kampanju #" + idx);
             await displayCampaigns();
           } catch (err) {
-            alert('Error: ' + err.message);
+            alert("Greška pri uplati: " + err.message);
           }
         };
-        div.appendChild(withdrawBtn);
+        div.appendChild(pledgeBtn);
       }
 
-      // Ako je kampanja završila i cilj nije postignut, omogući refund svima
-      if (now > c.endAt && c.pledged < c.goal) {
-        const refundBtn = document.createElement('button');
-        refundBtn.innerText = 'Refund';
-        refundBtn.onclick = async () => {
-          try {
-            await contract.refund(id);
-            alert('Refund successful!');
-            await displayCampaigns();
-          } catch (err) {
-            alert('Error: ' + err.message);
-          }
-        };
-        div.appendChild(refundBtn);
-      }
-
-      campaignList.appendChild(div);
+      listDiv.appendChild(div);
+      listDiv.appendChild(document.createElement("hr"));
     }
   });
 }
 
-// Funkcija za kreiranje nove kampanje
-async function createCampaign() {
-  const goalInput = document.getElementById('goal').value;
-  const durationInput = document.getElementById('duration').value;
-  if (!goalInput || !durationInput) {
-    alert('Unesite goal i duration!');
+// Funkcija koja se poziva kad korisnik pritisne “Create Campaign” gumb
+window.createCampaign = async function () {
+  const goalInput = document.getElementById("goal").value;
+  const durationInput = document.getElementById("duration").value;
+
+  if (!goalInput || Number(goalInput) <= 0) {
+    alert("Unesi ispravan cilj (> 0).");
     return;
   }
+  if (!durationInput || Number(durationInput) <= 0) {
+    alert("Unesi ispravno trajanje (> 0).");
+    return;
+  }
+
   try {
-    await contract.createCampaign(BigInt(goalInput), BigInt(durationInput));
-    alert('Campaign created!');
+    // Konvertiraj cilj iz ETH (string) u Wei (BigInt)
+    const goalWei = ethers.parseEther(goalInput.toString());
+    const durationSec = Number(durationInput);
+
+    // Pozovi pametni ugovor
+    const tx = await contract.createCampaign(goalWei, durationSec);
+    await tx.wait();
+    alert("Kampanja je uspješno kreirana!");
+
+    // Ponovno prikaži kampanje (ako je odmah aktivna)
     await displayCampaigns();
   } catch (err) {
-    alert('Error: ' + err.message);
+    alert("Greška pri kreiranju kampanje: " + err.message);
   }
-}
+};

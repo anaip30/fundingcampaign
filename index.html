@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Crowdfunding DApp</title>
+</head>
+<body>
+  <h1>Simple Crowdfunding DApp</h1>
+  
+  <div id="createCampaign">
+    <h2>Create Campaign</h2>
+    <label>Goal (in wei):</label>
+    <input id="goal" type="number" placeholder="Goal (wei)" /><br>
+    <label>Duration (in seconds):</label>
+    <input id="duration" type="number" placeholder="Duration (seconds)" /><br>
+    <button onclick="createCampaign()">Create Campaign</button>
+  </div>
+
+  <div id="campaigns">
+    <h2>Active Campaigns</h2>
+    <div id="campaignList"></div>
+  </div>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>

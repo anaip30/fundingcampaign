@@ -6,7 +6,9 @@ import "hardhat/console.sol";
 
 contract Crowdfunding {
     struct Campaign {
-        address payable owner;
+        address creator;
+        address payable beneficiary;
+        string  description;
         string  title;
         uint    goal;
         uint    pledged;
@@ -30,16 +32,20 @@ contract Crowdfunding {
 
     function createCampaign(
         string calldata _title,
+        string calldata _description,
         uint _goal,
-        uint _duration
+        uint _duration,
+        address payable _beneficiary
     ) external {
         require(_goal > 0, "Goal > 0");
         require(_duration > 0, "Duration > 0");
 
         campaignCount += 1;
         campaigns[campaignCount] = Campaign({
-            owner:    payable(msg.sender),
+            creator:    msg.sender,
             title:    _title,
+            beneficiary: _beneficiary,
+            description: _description,
             goal:     _goal,
             pledged:  0,
             deadline: block.timestamp + _duration,
@@ -78,14 +84,14 @@ contract Crowdfunding {
 
     function withdraw(uint _id) external validCampaign(_id) {
         Campaign storage camp = campaigns[_id];
-        require(msg.sender == camp.owner, "Nisi owner");
+        require(msg.sender == camp.creator, "Niste kreator kampanje");
         require(block.timestamp >= camp.deadline, "Campaign nije gotov");
         require(camp.pledged >= camp.goal, "Goal nije dosegnut");
         require(!camp.claimed, "Vec isplaceno");
 
         camp.claimed = true;
         uint amount = camp.pledged;
-        camp.owner.transfer(amount);
+        camp.beneficiary.transfer(amount);
 
         console.log(">> [Solidity] Withdraw kampanje ID =", _id);
         console.log("   owner:", msg.sender);

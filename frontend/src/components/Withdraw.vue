@@ -1,5 +1,5 @@
 <template>
-  <div class="withdraw">
+  <div class="component-card">
     <h2>Isplati sredstva (vlasnik)</h2>
 
     <div v-if="campaigns.length === 0">
@@ -7,9 +7,9 @@
     </div>
     <div v-else>
       <div class="form-group">
-        <label for="campSelect">Odaberi kampanju:</label>
-        <select id="campSelect" v-model="selectedCampaign">
-          <option disabled value="">-- odaberite kampanju --</option>
+        <label for="withdrawCampSelect">Odaberi kampanju za isplatu</label>
+        <select id="withdrawCampSelect" v-model="selectedCampaign">
+          <option disabled value=""> odaberite kampanju </option>
           <option v-for="c in campaigns" :key="c.id" :value="c.id">
             {{ c.id }} – {{ c.title }}
           </option>

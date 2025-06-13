@@ -59,33 +59,39 @@ export default {
 methods: {
   // U datoteci: frontend/src/components/CreateCampaign.vue
 
+// U datoteci: frontend/src/components/CreateCampaign.vue
 async submitCreate() {
   this.error = "";
   this.message = "";
 
-  // Validacija
-  if (!this.title.trim() || !this.description.trim() || !this.beneficiary.trim() || !this.goal.trim() || !this.duration.trim()) {
-    this.error = "Sva polja su obavezna.";
+  // --- ISPRAVLJENA VALIDACIJA ---
+
+  // 1. Provjera tekstualnih polja
+  if (!this.title.trim() || !this.description.trim() || !this.beneficiary.trim()) {
+    this.error = "Naslov, opis i adresa primatelja su obavezni.";
     return;
   }
   if (!ethers.utils.isAddress(this.beneficiary)) {
-    this.error = "Adresa primatelja nije ispravna.";
+    this.error = "Adresa primatelja nije ispravnog formata.";
     return;
   }
 
+  // 2. Provjera numeričkih polja
+  if (this.goal === '' || Number(this.goal) <= 0) {
+    this.error = "Unesite ispravan, pozitivan ciljni iznos (ETH).";
+    return;
+  }
+  if (this.duration === '' || Number(this.duration) <= 0) {
+    this.error = "Unesite ispravno, pozitivno trajanje u danima.";
+    return;
+  }
+
+  // --- KRAJ ISPRAVLJENE VALIDACIJE ---
+
   this.loading = true;
   try {
-    const goalInWei = ethers.utils.parseEther(this.goal);
+    const goalInWei = ethers.utils.parseEther(this.goal.toString()); // Dodan .toString() za sigurnost
     const durationInSeconds = Number(this.duration) * 86400;
-
- 
-    console.log("--- VRIJEDNOSTI PRIJE SLANJA TRANSAKCIJE ---");
-    console.log("Naslov (this.title):", this.title);
-    console.log("Opis (this.description):", this.description);
-    console.log("Primatelj (this.beneficiary):", this.beneficiary);
-    console.log("Cilj (goalInWei):", goalInWei.toString());
-    console.log("Trajanje (durationInSeconds):", durationInSeconds);
-    console.log("-------------------------------------------");
     
     const tx = await this.contract.createCampaign(
       this.title,
@@ -99,6 +105,7 @@ async submitCreate() {
     this.message = "Kampanja uspješno kreirana!";
     this.$emit("campaignCreated");
     
+    // Resetiraj polja
     this.title = "";
     this.description = "";
     this.beneficiary = "";
@@ -111,8 +118,7 @@ async submitCreate() {
   } finally {
     this.loading = false;
   }
-}
-}
+}}
 };
 </script>
 

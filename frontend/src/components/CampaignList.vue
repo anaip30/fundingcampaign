@@ -46,7 +46,8 @@ export default {
     },
     formatDate(timestamp) {
       if (timestamp === 0) return "N/A";
-      return new Date(timestamp * 1000).toLocaleDateString("hr-HR");
+      // PROMJENA: Koristi se toLocaleString() za prikaz datuma i vremena
+      return new Date(timestamp * 1000).toLocaleString("hr-HR");
     },
     getPercentage(pledged, goal) {
       if (goal.isZero() || pledged.isZero()) return 0;

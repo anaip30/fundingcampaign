@@ -59,52 +59,55 @@ export default {
     };
   },
   methods: {
-  async submitPledge() {
-    this.error   = "";
-    this.message = "";
+  // U datoteci: frontend/src/components/Pledge.vue
+async submitPledge() {
+  this.error   = "";
+  this.message = "";
 
-    // Validacije
-    if (!this.selectedCampaign) {
-      this.error = "Odaberite kampanju.";
-      return;
-    }
-    const raw = this.amount.trim();
-    if (!raw || isNaN(raw) || Number(raw) <= 0) {
-      this.error = "Unesite pozitivan iznos.";
-      return;
-    }
-
-    this.loading = true;
-    try {
-      await window.ethereum.request({ method: "eth_requestAccounts" });
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer   = provider.getSigner();
-
-      const userContract = this.contract.connect(signer);
-      
-      console.log("Slanje transakcije...");
-      const tx = await userContract.pledge(
-        Number(this.selectedCampaign),
-        { value: ethers.utils.parseEther(raw) }
-      );
-      
-      await tx.wait();
-      console.log("Transakcija uspješna:", tx.hash);
-
-      this.message = "Uplata uspješna!";
-      this.amount  = "";
-      this.$emit("campaignFunded"); 
-
-    } catch (err) {
-      console.error("Greška pri uplati:", err);
-      this.error = err.error?.message
-        ? err.error.message.replace("execution reverted: ", "")
-        : err.message;
-    } finally {
-      this.loading = false;
-    }
+  // Validacije
+  if (!this.selectedCampaign) {
+    this.error = "Odaberite kampanju.";
+    return;
   }
-}
+
+  // --- ISPRAVLJENA VALIDACIJA ZA BROJ ---
+  // Provjeravamo je li 'amount' prazan, nije broj, ili je nula/negativan.
+  if (this.amount === "" || isNaN(this.amount) || Number(this.amount) <= 0) {
+    this.error = "Unesite ispravan, pozitivan iznos.";
+    return;
+  }
+
+  this.loading = true;
+  try {
+    await window.ethereum.request({ method: "eth_requestAccounts" });
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer   = provider.getSigner();
+
+    const userContract = this.contract.connect(signer);
+    
+    // Pretvaramo broj u string prije slanja u parseEther radi sigurnosti
+    const amountAsString = this.amount.toString();
+    
+    console.log("Slanje transakcije...");
+    const tx = await userContract.pledge(
+      Number(this.selectedCampaign),
+      { value: ethers.utils.parseEther(amountAsString) }
+    );
+    
+    await tx.wait();
+    console.log("Transakcija uspješna:", tx.hash);
+
+    this.message = "Uplata uspješna!";
+    this.amount  = "";
+    this.$emit("campaignFunded"); 
+
+  } catch (err) {
+    console.error("Greška pri uplati:", err);
+    this.error = err.reason || err.message;
+  } finally {
+    this.loading = false;
+  }
+}}
 };
 </script>
 
